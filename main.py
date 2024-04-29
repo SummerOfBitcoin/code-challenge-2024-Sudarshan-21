@@ -131,7 +131,7 @@ def serialize_transaction(transactions):
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
     txid_data = little_endian_bytes(version, 4) + tx_data
-    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest().hex()
+    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest()[::-1].hex()
     txid_array.append(ser_tx_hash)
 
   return txid_array
@@ -195,7 +195,7 @@ def wit_serialize_transaction(transactions):
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
     wtxid_data = little_endian_bytes(version, 4) + tx_data
-    wtxid = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest().hex()
+    wtxid = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()[::-1].hex()
     if 'witness' in input:
      wtxid_array.append(wtxid)
 
@@ -412,11 +412,9 @@ def validate_transaction(transaction):
         print(f"Error validating transaction: {str(e)}")
         return False
 
-def write_transaction_ids(output_file, transactions):
-    for tx in transactions:
-        for vin in tx.get('vin', []):
-            if 'txid' in vin:
-                output_file.write(f"{vin['txid']}\n")
+def write_transaction_ids(output_file, trxn_ids):
+    for trxn_id in trxn_ids:
+            output_file.write(f"{trxn_id}\n")
 
 
 def merkle_root(txids):
@@ -452,7 +450,7 @@ def hash2(a, b):
 def calculate_block_hash(block_header):
     try:
         # Encode the block header string as bytes using UTF-8 encoding
-        block_header_bytes = block_header.encode('utf-8')
+        block_header_bytes = bytes.fromhex(block_header)
         # Calculate double SHA-256 hash
         hash_1 = hashlib.sha256(block_header_bytes).digest()
         hash_2 = hashlib.sha256(hash_1).digest()
@@ -462,28 +460,25 @@ def calculate_block_hash(block_header):
         print(f"Error calculating block hash: {str(e)}")
         return None
     
-def mine_block(transactions, prev_block_hash, difficulty_target, merkle_root, ser_coinbase_trxn, coinbase_txid):
-    version = 1  # Placeholder for block version
-    bits = difficulty_target  # Placeholder for difficulty target
 
-    # Convert version and bits to hexadecimal format
-    version_hex = convert_version_to_hex(str(version))
-    bits_hex = convert_bits_to_hex(bits)
 
+    
+def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinbase_trxn, coinbase_txid):
+   # Convert version and bits to hexadecimal format
+    version_hex = "00000004"
+    bits = "1f00ffff"
     timestamp = int(time.time())  # Current Unix timestamp
-    timestamp_hex = convert_timestamp_to_hex(timestamp)
+    timestamp_hex = timestamp.to_bytes(4, byteorder='little').hex()
     nonce = 0
 
     while True:
         nonce_hex = nonce.to_bytes(4, byteorder='little', signed=False).hex()
 
-        # Construct the block header using calculate_block_header function
-        block_header = calculate_block_header(version_hex, prev_block_hash, merkle_root, timestamp_hex, bits_hex, nonce_hex)
-        if block_header is None:
-            return None  # Handle the case where block_header calculation fails
-
+        # Construct the block header
+        block_header = version_hex + prev_block_hash + merkle_root + timestamp_hex + bits + nonce_hex
+        
         # Calculate the block hash
-        block_hash = calculate_block_hash(block_header)
+        block_hash = hashlib.sha256(hashlib.sha256(bytes.fromhex(block_header)).digest()).digest()
         # Check if the block hash meets the difficulty target
         if int.from_bytes(block_hash[::-1], byteorder='big') < int(difficulty_target, 16):
             print(f"Block mined! Nonce: {nonce}")
@@ -493,12 +488,11 @@ def mine_block(transactions, prev_block_hash, difficulty_target, merkle_root, se
                 output_file.write(block_header + '\n')
                 output_file.write(ser_coinbase_trxn + '\n')
                 output_file.write(coinbase_txid + '\n')
-                write_transaction_ids(output_file, transactions)  # Write transaction IDs to output file
-            return block_header, block_hash.hex()
+                write_transaction_ids(output_file, txids)  # Write transaction IDs to output file
+            return block_header, block_hash[::-1].hex()
 
         # Increment the nonce and try again
         nonce += 1
-
 def main():
     transactions = []
 
@@ -526,13 +520,14 @@ def main():
         wit_commitment = compute_witness_commitment(wit_hash)
         coinbase_trxn_struct = create_coinbase(wit_commitment)
         wtx_arr, ser_coinbase_trxn, coinbase_txid = wit_serialize_transaction(coinbase_trxn_struct)
+        print(f"ser_coinbase:{ser_coinbase_trxn}")
 
         # Placeholder values for previous block hash and difficulty target
         prev_block_hash = "0000000000000000000000000000000000000000000000000000000000000000"
         difficulty_target = "0000ffff00000000000000000000000000000000000000000000000000000000"
         
         # Mine the block using transactions from the mempool
-        block_header, block_hash = mine_block(valid_transactions, prev_block_hash, difficulty_target, calc_merkle_root, ser_coinbase_trxn, coinbase_txid)
+        block_header, block_hash = mine_block(txids, prev_block_hash, difficulty_target, calc_merkle_root, ser_coinbase_trxn, coinbase_txid)
 
 
         print(f"Block Header: {block_header}")
