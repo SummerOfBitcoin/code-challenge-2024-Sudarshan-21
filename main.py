@@ -417,23 +417,23 @@ def write_transaction_ids(output_file, trxn_ids):
             output_file.write(f"{trxn_id}\n")
 
 
-def merkle_root(txids):
+def merkle_root(ser_txids):
     # Compute Merkle root hash using the extracted txids
-    if len(txids) == 0:
+    if len(ser_txids) == 0:
         return None
 
-    while len(txids) > 1:
+    while len(ser_txids) > 1:
         next_level = []
         # Pair and hash the txids
-        for i in range(0, len(txids), 2):
-            if i + 1 < len(txids):  # Ensure we have pairs
-                hash_pair = hash2(txids[i], txids[i+1])
+        for i in range(0, len(ser_txids), 2):
+            if i + 1 < len(ser_txids):  # Ensure we have pairs
+                hash_pair = hash2(ser_txids[i], ser_txids[i+1])
             else:  # If odd number of txids, hash with itself
-                hash_pair = hash2(txids[i], txids[i])
+                hash_pair = hash2(ser_txids[i], ser_txids[i])
             next_level.append(hash_pair)
-        txids = next_level  # Update txids to next level
+        ser_txids = next_level  # Update txids to next level
     
-    return txids[0] if txids else None
+    return ser_txids[0] if ser_txids else None
 
 def hash2(a, b):
     # Reverse inputs before and after hashing due to endian issues
@@ -487,7 +487,6 @@ def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinb
             with open('output.txt', 'w') as output_file:
                 output_file.write(block_header + '\n')
                 output_file.write(ser_coinbase_trxn + '\n')
-                output_file.write(coinbase_txid + '\n')
                 write_transaction_ids(output_file, txids)  # Write transaction IDs to output file
             return block_header, block_hash[::-1].hex()
 
@@ -519,8 +518,8 @@ def main():
         coinbase_trxn_struct = create_coinbase(wit_commitment)
         wtx_arr, ser_coinbase_trxn, coinbase_txid = wit_serialize_transaction(coinbase_trxn_struct)
         print(f"ser_coinbase:{ser_coinbase_trxn}")
-        txids.unshift(coinbase_txid)
-
+        txids.insert(0, coinbase_txid)
+        print(f"{txids}")
         calc_merkle_root = merkle_root(txids)
         print(f"mekle root:{calc_merkle_root}")
 
