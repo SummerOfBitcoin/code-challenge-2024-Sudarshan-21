@@ -197,11 +197,11 @@ def wit_serialize_transaction(transactions):
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
     wtxid_data = little_endian_bytes(version, 4) + tx_data
-    wtxid = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()[::-1].hex()
+    wtxid_hash = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()
     if 'witness' in input:
-     wtxid_array.append(wtxid)
+     wtxid_array.append(wtxid_hash[::-1].hex())
 
-  return wtxid_array, wtxid_data.hex(), wtxid
+  return wtxid_array, wtxid_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
 
 def compute_witness_commitment(witness_root_hash):
@@ -512,15 +512,16 @@ def main():
         print(f"Number of valid transactions read from mempool: {len(valid_transactions)}")
 
         txids, rev_trxn_ids = serialize_transaction(valid_transactions)
-        wtxids, ser_wit_trxn, wtxid = wit_serialize_transaction(valid_transactions)
+        wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(valid_transactions)
 
 
         wit_hash = merkle_root(wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
         coinbase_trxn_struct = create_coinbase(wit_commitment)
-        wtx_arr, ser_coinbase_trxn, coinbase_txid = wit_serialize_transaction(coinbase_trxn_struct)
+        wtx_arr, ser_coinbase_trxn, coinbase_txid, rev_coinb_trxn = wit_serialize_transaction(coinbase_trxn_struct)
         print(f"ser_coinbase:{ser_coinbase_trxn}")
-        rev_trxn_ids.insert(0, coinbase_txid)
+        rev_trxn_ids.insert(0, rev_coinb_trxn)
+        txids.insert(0, coinbase_txid)
         calc_merkle_root = merkle_root(rev_trxn_ids)
         print(f"mekle root:{calc_merkle_root}")
 
