@@ -131,7 +131,7 @@ def serialize_transaction(transactions):
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
     txid_data = little_endian_bytes(version, 4) + tx_data
-    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest()[::-1].hex()
+    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest().hex()
     txid_array.append(ser_tx_hash)
 
   return txid_array
@@ -195,7 +195,7 @@ def wit_serialize_transaction(transactions):
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
     wtxid_data = little_endian_bytes(version, 4) + tx_data
-    wtxid = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()[::-1].hex()
+    wtxid = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest().hex()
     if 'witness' in input:
      wtxid_array.append(wtxid)
 
