@@ -513,14 +513,16 @@ def main():
         txids = serialize_transaction(valid_transactions)
         wtxids, ser_wit_trxn, wtxid = wit_serialize_transaction(valid_transactions)
 
-        calc_merkle_root = merkle_root(txids)
-        print(f"mekle root:{calc_merkle_root}")
 
         wit_hash = merkle_root(wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
         coinbase_trxn_struct = create_coinbase(wit_commitment)
         wtx_arr, ser_coinbase_trxn, coinbase_txid = wit_serialize_transaction(coinbase_trxn_struct)
         print(f"ser_coinbase:{ser_coinbase_trxn}")
+        txids.unshift(coinbase_txid)
+
+        calc_merkle_root = merkle_root(txids)
+        print(f"mekle root:{calc_merkle_root}")
 
         # Placeholder values for previous block hash and difficulty target
         prev_block_hash = "0000000000000000000000000000000000000000000000000000000000000000"
