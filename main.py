@@ -86,6 +86,7 @@ def varint_encode(value):
 
 def serialize_transaction(transactions):
   txid_array = []
+  rev_txid_array = []
   for transaction in transactions:
     version = transaction['version']
     locktime = transaction['locktime']
@@ -131,10 +132,11 @@ def serialize_transaction(transactions):
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
     txid_data = little_endian_bytes(version, 4) + tx_data
-    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest()[::-1].hex()
-    txid_array.append(ser_tx_hash)
+    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest()
+    txid_array.append(ser_tx_hash.hex())
+    rev_txid_array.append(ser_tx_hash[::-1].hex())
 
-  return txid_array
+  return txid_array, rev_txid_array
 
 
 def wit_serialize_transaction(transactions):
@@ -509,7 +511,7 @@ def main():
         valid_transactions = [tx for tx in transactions if validate_transaction(tx)]
         print(f"Number of valid transactions read from mempool: {len(valid_transactions)}")
 
-        txids = serialize_transaction(valid_transactions)
+        txids, rev_trxn_ids = serialize_transaction(valid_transactions)
         wtxids, ser_wit_trxn, wtxid = wit_serialize_transaction(valid_transactions)
 
 
@@ -518,9 +520,8 @@ def main():
         coinbase_trxn_struct = create_coinbase(wit_commitment)
         wtx_arr, ser_coinbase_trxn, coinbase_txid = wit_serialize_transaction(coinbase_trxn_struct)
         print(f"ser_coinbase:{ser_coinbase_trxn}")
-        txids.insert(0, coinbase_txid)
-        print(f"{txids}")
-        calc_merkle_root = merkle_root(txids)
+        rev_trxn_ids.insert(0, coinbase_txid)
+        calc_merkle_root = merkle_root(rev_trxn_ids)
         print(f"mekle root:{calc_merkle_root}")
 
         # Placeholder values for previous block hash and difficulty target
