@@ -371,7 +371,7 @@ def create_coinbase(wTXID_commit):
             "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 81897cd2113b1b0bf0e718cc791d9bd2d246c555",
             "scriptpubkey_type": "v0_p2wpkh",
             "scriptpubkey_address": "bc1qsxyhe5s38vdshu88rrx8j8vm6tfyd324l640wa",
-            "value": 143270
+            "value": 0
           },
         "scriptsig": "03233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100",
         "scriptsig_asm": "",
@@ -380,7 +380,7 @@ def create_coinbase(wTXID_commit):
         ]
         ,
         "is_coinbase": True,
-        "sequence": 4294837295
+        "sequence": 0
         }
         ],
         "vout": [
