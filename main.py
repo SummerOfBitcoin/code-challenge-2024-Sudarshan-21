@@ -272,7 +272,7 @@ def wit_serialize_transaction(transactions):
     wtxid_data = little_endian_bytes(version, 4) + tx_data
     wtxid_hash = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()
     if 'witness' in input:
-     wtxid_array.append(wtxid_hash[::-1].hex())
+     wtxid_array.append(wtxid_hash.hex())
 
   return wtxid_array, wtxid_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
