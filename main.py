@@ -327,14 +327,15 @@ def create_coinbase(wTXID_commit):
          "scriptpubkey_type": "p2pkh",
          "scriptpubkey_address": "1GkuQGoy1erCJfQKY9AGC75rttCBQRtGer",
          "value": 2756995
-        }],
-        "witness": [{
+        },
+        {
         "scriptpubkey": wTXID_commit,
         "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 56789b58e00f0a9e866e2a4ea0b0d97e839c4b0d",
         "scriptpubkey_type": "v0_p2wpkh",
         "scriptpubkey_address": "bc1q2eufkk8qpu9fapnw9f82pvxe06pecjcd7ea2x0",
         "value": 1098
-       }]  
+       }
+    ]
     }]
      return coinbase_struct
 
