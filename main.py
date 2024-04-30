@@ -213,7 +213,7 @@ def serialize_transaction(transactions):
 
 
 def wit_serialize_transaction(transactions):
-  wtxid_array = []
+  wtxid_array = ['0000000000000000000000000000000000000000000000000000000000000000']
   for transaction in transactions:
     version = transaction['version']
     locktime = transaction['locktime']
@@ -355,7 +355,7 @@ def compute_witness_commitment(witness_root_hash):
     sha256d_hash = hashlib.sha256(sha256_hash).digest()
 
     # Derive the wTXID commitment (hexadecimal representation)
-    wtxid_commitment = sha256d_hash[::-1].hex()  # Reverse bytes for little-endian
+    wtxid_commitment = sha256d_hash.hex()  # Reverse bytes for little-endian
 
     return wtxid_commitment
 
@@ -682,9 +682,9 @@ def main():
         txids, rev_trxn_ids, ser_trxn, ser_tx_id = serialize_transaction(block_trxns)
         wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
 
-
         wit_hash = merkle_root(wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
+        print(f"{wit_commitment}")
         coinbase_trxn_struct = create_coinbase(wit_commitment, "951a06")
 
         ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_coinbase(coinbase_trxn_struct)
