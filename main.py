@@ -554,7 +554,7 @@ def calculate_block_hash(block_header):
 def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinbase_trxn):
    # Convert version and bits to hexadecimal format
     version_hex = "00000004"
-    bits = "1f00ffff"
+    bits = "ffff001f"
     timestamp = int(time.time())  # Current Unix timestamp
     timestamp_hex = timestamp.to_bytes(4, byteorder='little').hex()
     nonce = 0
