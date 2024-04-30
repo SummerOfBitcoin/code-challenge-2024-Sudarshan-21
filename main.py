@@ -207,7 +207,7 @@ def serialize_transaction(transactions):
     tx_data += little_endian_bytes(locktime, 4)
     ser_tx_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
     txid_array.append(ser_tx_hash.hex())
-    rev_txid_array.append(hashlib.sha256(ser_tx_hash[::-1]).digest().hex())
+    rev_txid_array.append(ser_tx_hash[::-1].hex())
 
   return txid_array, rev_txid_array, tx_data.hex(), ser_tx_hash[::-1].hex()
 
