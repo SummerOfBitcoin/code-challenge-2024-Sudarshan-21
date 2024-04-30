@@ -316,7 +316,7 @@ def create_coinbase(wTXID_commit):
         "witness": "0000000000000000000000000000000000000000000000000000000000000000"
         ,
         "is_coinbase": True,
-        "sequence": 00000000
+        "sequence": 4294837295
         }
         ],
         "vout": [
