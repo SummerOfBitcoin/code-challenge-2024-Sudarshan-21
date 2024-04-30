@@ -220,14 +220,19 @@ def wit_serialize_transaction(transactions):
     inputs = transaction['vin']
     outputs = transaction['vout']
 
-    # Start building the transaction byte array
     tx_data = (
-        varint_encode(len(inputs))
+        little_endian_bytes(version, 4) 
     )
 
+    has_witness = any('witness' in vin for vin in inputs)
+    if has_witness :
+     tx_data += bytes.fromhex('00')
+     tx_data += bytes.fromhex('01')
     # Process each input
+
+    tx_data += varint_encode(len(inputs))
     for input in inputs:
-        txid = bytes.fromhex(input['txid'][::-1])  # Reverse txid for little-endian
+        txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
         prev_tx_out_index = input['vout']
         scriptsig = bytes.fromhex(input['scriptsig'])
         sequence = input['sequence']
@@ -255,26 +260,24 @@ def wit_serialize_transaction(transactions):
             varint_encode(len(script_pubkey)) +
             script_pubkey
         )
-  # Append locktime
-
-    # If transaction has witness data, append it before hashing
-    if any('witness' in vin for vin in inputs):
+    
+    if has_witness:
         for input in inputs:
             if 'witness' in input:
+                witness = input['witness']
+                tx_data += varint_encode(len(witness))
                 for witness_item in input['witness']:
-                    tx_data += varint_encode(len(witness_item) // 2)  # Length of witness item in bytes
+                    tx_data += varint_encode(len(bytes.fromhex(witness_item)))  # Length of witness item
                     tx_data += bytes.fromhex(witness_item)
-                    marker = bytes.fromhex('00')
-                    flag = bytes.fromhex('01')
-                    tx_data = marker + flag + tx_data  # Add segwit marker and flag
+
+
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
-    wtxid_data = little_endian_bytes(version, 4) + tx_data
-    wtxid_hash = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()
+    wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
 
     wtxid_array.append(wtxid_hash[::-1].hex())
 
-  return wtxid_array, wtxid_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
+  return wtxid_array, tx_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
 
 
@@ -680,9 +683,8 @@ def main():
         print(f"Number of valid transactions in block: {len(block_trxns)}")
 
         txids, rev_trxn_ids, ser_trxn, ser_tx_id = serialize_transaction(block_trxns)
-        wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
-
-        wit_hash = merkle_root(wtxids)
+        rev_wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
+        wit_hash = merkle_root(rev_wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
         print(f"{wit_commitment}")
         coinbase_trxn_struct = create_coinbase(wit_commitment, "951a06")
