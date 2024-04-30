@@ -209,7 +209,7 @@ def serialize_transaction(transactions):
     txid_array.append(ser_tx_hash.hex())
     rev_txid_array.append(ser_tx_hash[::-1].hex())
 
-  return txid_array, rev_txid_array
+  return txid_array, rev_txid_array, txid_data.hex(), ser_tx_hash[::-1].hex()
 
 
 def wit_serialize_transaction(transactions):
@@ -609,17 +609,15 @@ def main():
         
         print(f"Number of valid transactions in block: {len(block_trxns)}")
 
-        txids, rev_trxn_ids = serialize_transaction(block_trxns)
+        txids, rev_trxn_ids, ser_trxn, ser_tx_id = serialize_transaction(block_trxns)
         wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
 
 
         wit_hash = merkle_root(wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
         coinbase_trxn_struct = create_coinbase(wit_commitment)
-        wtx_arr, ser_coinbase_trxn, coinbase_txid, rev_coinb_trxn = wit_serialize_transaction(coinbase_trxn_struct)
-        print(f"ser_coinbase:{ser_coinbase_trxn}")
-        rev_trxn_ids.insert(0, rev_coinb_trxn)
-        txids.insert(0, coinbase_txid)
+        txid_arr, rev_txid_arr, ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_transaction(coinbase_trxn_struct)
+        rev_trxn_ids.insert(0, rev_ser_coinbase_trxn_id)
         calc_merkle_root = merkle_root(rev_trxn_ids)
         print(f"mekle root:{calc_merkle_root}")
         nat_order_merkle_root = reverse_byte_order(calc_merkle_root)
