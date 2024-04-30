@@ -358,7 +358,7 @@ def compute_witness_commitment(witness_root_hash):
 
     return wtxid_commitment
 
-def create_coinbase(wTXID_commit):
+def create_coinbase(wTXID_commit, block_Height):
      coinbase_struct = [{
         "version": 2,
         "locktime": 0,
@@ -373,8 +373,7 @@ def create_coinbase(wTXID_commit):
             "scriptpubkey_address": "bc1qsxyhe5s38vdshu88rrx8j8vm6tfyd324l640wa",
             "value": 0
           },
-        "scriptsig": "03233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100",
-        "scriptsig_asm": "",
+        "scriptsig": "03" + block_Height + "10076c0000946e0100",
         "witness": [
             "0000000000000000000000000000000000000000000000000000000000000000"
         ]
@@ -686,7 +685,7 @@ def main():
 
         wit_hash = merkle_root(wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
-        coinbase_trxn_struct = create_coinbase(wit_commitment)
+        coinbase_trxn_struct = create_coinbase(wit_commitment, "951a06")
 
         ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_coinbase(coinbase_trxn_struct)
         print(f"ser_coinbase:{ser_coinbase_trxn}")
