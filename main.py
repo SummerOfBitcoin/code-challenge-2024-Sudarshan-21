@@ -311,7 +311,7 @@ def create_coinbase(wTXID_commit):
             "scriptpubkey_address": "bc1qsxyhe5s38vdshu88rrx8j8vm6tfyd324l640wa",
             "value": 143270
           },
-        "scriptsig": "",
+        "scriptsig": "03233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100",
         "scriptsig_asm": "",
         "witness": [
            "0000000000000000000000000000000000000000000000000000000000000000"
