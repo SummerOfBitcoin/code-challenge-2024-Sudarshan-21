@@ -327,6 +327,7 @@ def serialize_coinbase(transactions):
         for input in inputs:
             if 'witness' in input:
                 for witness_item in input['witness']:
+                    tx_data += bytes.fromhex('01')
                     tx_data += varint_encode(len(witness_item) // 2)  # Length of witness item in bytes
                     tx_data += bytes.fromhex(witness_item)
                     marker = bytes.fromhex('00')
@@ -399,9 +400,8 @@ def create_coinbase(wTXID_commit, block_Height):
        }
     ],
     "witness": [{
-            "stackitems": "01",
             "0": {
-                "size": "20",
+                "size": "01",
                 "item": "0000000000000000000000000000000000000000000000000000000000000000"
             }
         }
