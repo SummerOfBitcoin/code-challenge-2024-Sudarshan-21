@@ -12,6 +12,79 @@ MEMPOOL_FOLDER = "./mempool"
 
 PUBLIC_KEYS_DIR = "./public_keys"
 
+
+def calculate_base_size(transaction):
+    base_size = 8  # version (4 bytes) + locktime (4 bytes)
+
+    # Calculate size for each input
+    for vin in transaction['vin']:
+        base_size += 32  # txid (32 bytes)
+        base_size += 4   # vout (4 bytes)
+
+        # Calculate ScriptSig length
+        script_sig_length = len(vin.get('scriptsig', '')) // 2  # Convert hex string length to bytes
+        base_size += script_sig_length + 1  # scriptsig length (1 byte) + scriptSig length
+
+        base_size += 4   # sequence (4 bytes)
+
+    # Calculate size for each output
+    for vout in transaction['vout']:
+        base_size += 8   # value (8 bytes)
+        base_size += 1   # scriptpubkey length (1 byte)
+        base_size += len(vout['scriptpubkey']) // 2  # scriptpubkey length (variable)
+
+    return base_size
+
+def calculate_total_size(transaction):
+    total_size = 0
+
+    # Add witness data size for SegWit transactions
+    for vin in transaction['vin']:
+        if 'witness' in vin and vin['witness']:
+            # Include witness marker (1 byte) and flag (1 byte)
+            total_size += 2
+            # Add witness stack size
+            total_size += len(vin['witness']) * 64  # Assuming witness stack items are 64 bytes each
+
+    return total_size
+
+def calculate_transaction_weight(transaction):
+    base_size = calculate_base_size(transaction)
+    total_size = calculate_total_size(transaction)
+
+    weight = 4 * base_size + total_size
+    return weight
+
+
+
+def calculate_transaction_weights(transactions):
+    # Calculate weights for each transaction
+    transaction_weights = []
+    for transaction in transactions:
+        weight = calculate_transaction_weight(transaction)
+        transaction_weights.append((transaction, weight))
+
+    # Sort transactions by weight (ascending order)
+    transaction_weights.sort(key=lambda x: x[1])
+
+    return transaction_weights
+
+
+def trim_transactions(transactions, max_weight):
+    sorted_transaction_weights = calculate_transaction_weights(transactions)
+    selected_transactions = []
+    current_weight = 0
+
+    for transaction, weight in sorted_transaction_weights:
+        if current_weight + weight <= max_weight:
+            selected_transactions.append((transaction, weight))
+            current_weight += weight
+        else:
+            break
+
+    return selected_transactions, current_weight
+
+
 def load_public_key(address):
     """ Load public key from file based on address """
     filename = os.path.join(PUBLIC_KEYS_DIR, f"{address}.pub")
@@ -449,6 +522,19 @@ def hash2(a, b):
     return final_hash_hex
 
 
+def reverse_byte_order(hex_string):
+    # Convert the hexadecimal string to bytes
+    byte_sequence = bytes.fromhex(hex_string)
+
+    # Reverse the byte order
+    reversed_byte_sequence = byte_sequence[::-1]
+
+    # Convert the reversed byte sequence back to hexadecimal
+    reversed_hex_string = reversed_byte_sequence.hex()
+
+    return reversed_hex_string
+
+
 def calculate_block_hash(block_header):
     try:
         # Encode the block header string as bytes using UTF-8 encoding
@@ -465,7 +551,7 @@ def calculate_block_hash(block_header):
 
 
     
-def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinbase_trxn, coinbase_txid):
+def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinbase_trxn):
    # Convert version and bits to hexadecimal format
     version_hex = "00000004"
     bits = "1f00ffff"
@@ -510,9 +596,21 @@ def main():
         # Filter transactions to include only those with valid 'vin' and 'txid'
         valid_transactions = [tx for tx in transactions if validate_transaction(tx)]
         print(f"Number of valid transactions read from mempool: {len(valid_transactions)}")
+        
+        max_total_weight = 4000000  # Maximum cumulative weight allowed (4 million weight units)
 
-        txids, rev_trxn_ids = serialize_transaction(valid_transactions)
-        wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(valid_transactions)
+        # Trim transactions to meet the weight constraint
+        selected_transactions, total_weight = trim_transactions(valid_transactions, max_total_weight)
+        print(f"Total Cumulative Weight: {total_weight}")
+        block_trxns = []
+        for transaction, weight in selected_transactions:
+          block_trxns.append(transaction)
+
+        
+        print(f"Number of valid transactions in block: {len(block_trxns)}")
+
+        txids, rev_trxn_ids = serialize_transaction(block_trxns)
+        wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
 
 
         wit_hash = merkle_root(wtxids)
@@ -524,19 +622,19 @@ def main():
         txids.insert(0, coinbase_txid)
         calc_merkle_root = merkle_root(rev_trxn_ids)
         print(f"mekle root:{calc_merkle_root}")
-
+        nat_order_merkle_root = reverse_byte_order(calc_merkle_root)
+        print(f"nat mekle root:{nat_order_merkle_root}")
         # Placeholder values for previous block hash and difficulty target
         prev_block_hash = "0000000000000000000000000000000000000000000000000000000000000000"
         difficulty_target = "0000ffff00000000000000000000000000000000000000000000000000000000"
         
         # Mine the block using transactions from the mempool
-        block_header, block_hash = mine_block(txids, prev_block_hash, difficulty_target, calc_merkle_root, ser_coinbase_trxn, coinbase_txid)
+        block_header, block_hash = mine_block(rev_trxn_ids, prev_block_hash, difficulty_target, nat_order_merkle_root, ser_coinbase_trxn)
 
 
         print(f"Block Header: {block_header}")
         print(f"Block Hash: {block_hash}")
         print(f"Coinbase Transaction: {coinbase_trxn_struct}")
-        print(f"ser Coinbase Transaction: {ser_coinbase_trxn}")
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
