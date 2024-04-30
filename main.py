@@ -168,12 +168,13 @@ def serialize_transaction(transactions):
 
     # Start building the transaction byte array
     tx_data = (
+        little_endian_bytes(version, 4) +
         varint_encode(len(inputs))
     )
 
     # Process each input
     for input in inputs:
-        txid = bytes.fromhex(input['txid'])  # Reverse txid for little-endian
+        txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
         prev_tx_out_index = input['vout']
         scriptsig = bytes.fromhex(input['scriptsig'])
         sequence = input['sequence']
@@ -204,12 +205,11 @@ def serialize_transaction(transactions):
 
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
-    txid_data = little_endian_bytes(version, 4) + tx_data
-    ser_tx_hash = hashlib.sha256(hashlib.sha256(txid_data).digest()).digest()
+    ser_tx_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
     txid_array.append(ser_tx_hash.hex())
-    rev_txid_array.append(ser_tx_hash[::-1].hex())
+    rev_txid_array.append(hashlib.sha256(ser_tx_hash[::-1]).digest().hex())
 
-  return txid_array, rev_txid_array, txid_data.hex(), ser_tx_hash[::-1].hex()
+  return txid_array, rev_txid_array, tx_data.hex(), ser_tx_hash[::-1].hex()
 
 
 def wit_serialize_transaction(transactions):
@@ -617,6 +617,8 @@ def main():
         wit_commitment = compute_witness_commitment(wit_hash)
         coinbase_trxn_struct = create_coinbase(wit_commitment)
         txid_arr, rev_txid_arr, ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_transaction(coinbase_trxn_struct)
+        print(f"ser_coinbase:{ser_coinbase_trxn}")
+        print(f"rev_coinbase_id:{rev_ser_coinbase_trxn_id}")
         rev_trxn_ids.insert(0, rev_ser_coinbase_trxn_id)
         calc_merkle_root = merkle_root(rev_trxn_ids)
         print(f"mekle root:{calc_merkle_root}")
