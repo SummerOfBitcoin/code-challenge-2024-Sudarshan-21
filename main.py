@@ -288,14 +288,19 @@ def serialize_coinbase(transactions):
     inputs = transaction['vin']
     outputs = transaction['vout']
 
-    # Start building the transaction byte array
     tx_data = (
-        varint_encode(len(inputs))
+        little_endian_bytes(version, 4) 
     )
 
+    has_witness = any('witness' in vin for vin in inputs)
+    if has_witness :
+     tx_data += bytes.fromhex('00')
+     tx_data += bytes.fromhex('01')
     # Process each input
+
+    tx_data += varint_encode(len(inputs))
     for input in inputs:
-        txid = bytes.fromhex(input['txid'][::-1])  # Reverse txid for little-endian
+        txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
         prev_tx_out_index = input['vout']
         scriptsig = bytes.fromhex(input['scriptsig'])
         sequence = input['sequence']
@@ -323,25 +328,23 @@ def serialize_coinbase(transactions):
             varint_encode(len(script_pubkey)) +
             script_pubkey
         )
-  # Append locktime
-
-    # If transaction has witness data, append it before hashing
-    if any('witness' in vin for vin in inputs):
+    
+    if has_witness:
         for input in inputs:
             if 'witness' in input:
+                witness = input['witness']
+                tx_data += varint_encode(len(witness))
                 for witness_item in input['witness']:
-                    tx_data += bytes.fromhex('01')
-                    tx_data += varint_encode(len(witness_item) // 2)  # Length of witness item in bytes
+                    tx_data += varint_encode(len(bytes.fromhex(witness_item)))  # Length of witness item
                     tx_data += bytes.fromhex(witness_item)
-                    marker = bytes.fromhex('00')
-                    flag = bytes.fromhex('01')
-                    tx_data = marker + flag + tx_data  # Add segwit marker and flag
+
+
     # Calculate wtxid (hash of tx_data with marker and flag)
     tx_data += little_endian_bytes(locktime, 4)
-    wtxid_data = little_endian_bytes(version, 4) + tx_data
-    wtxid_hash = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()
+    wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
 
- return wtxid_data.hex(), wtxid_hash[::-1].hex()
+ 
+ return tx_data.hex(), wtxid_hash[::-1].hex()
 
 def compute_witness_commitment(witness_root_hash):
 
