@@ -358,7 +358,7 @@ def compute_witness_commitment(witness_root_hash):
     sha256d_hash = hashlib.sha256(sha256_hash).digest()
 
     # Derive the wTXID commitment (hexadecimal representation)
-    wtxid_commitment = sha256d_hash.hex()  # Reverse bytes for little-endian
+    wtxid_commitment = sha256d_hash[::-1].hex()  # Reverse bytes for little-endian
 
     return wtxid_commitment
 
