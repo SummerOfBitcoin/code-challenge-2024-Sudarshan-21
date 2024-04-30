@@ -227,7 +227,7 @@ def wit_serialize_transaction(transactions):
 
     # Process each input
     for input in inputs:
-        txid = bytes.fromhex(input['txid'])  # Reverse txid for little-endian
+        txid = bytes.fromhex(input['txid'][::-1])  # Reverse txid for little-endian
         prev_tx_out_index = input['vout']
         scriptsig = bytes.fromhex(input['scriptsig'])
         sequence = input['sequence']
@@ -277,6 +277,68 @@ def wit_serialize_transaction(transactions):
   return wtxid_array, wtxid_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
 
+
+def serialize_coinbase(transactions):
+ for transaction in transactions:
+    version = transaction['version']
+    locktime = transaction['locktime']
+    inputs = transaction['vin']
+    outputs = transaction['vout']
+
+    # Start building the transaction byte array
+    tx_data = (
+        varint_encode(len(inputs))
+    )
+
+    # Process each input
+    for input in inputs:
+        txid = bytes.fromhex(input['txid'][::-1])  # Reverse txid for little-endian
+        prev_tx_out_index = input['vout']
+        scriptsig = bytes.fromhex(input['scriptsig'])
+        sequence = input['sequence']
+
+        # Append txid, prev_tx_out_index, scriptsig
+        tx_data += (
+            txid +
+            little_endian_bytes(prev_tx_out_index, 4) +
+            varint_encode(len(scriptsig)) +
+            scriptsig +
+            little_endian_bytes(sequence, 4)
+        )
+
+    # Output count
+    tx_data += varint_encode(len(outputs))
+
+    # Process each output
+    for output in outputs:
+        value = output['value']
+        script_pubkey = bytes.fromhex(output['scriptpubkey'])
+
+        # Append output value, script_pubkey
+        tx_data += (
+            little_endian_bytes(value, 8) +
+            varint_encode(len(script_pubkey)) +
+            script_pubkey
+        )
+  # Append locktime
+
+    # If transaction has witness data, append it before hashing
+    if any('witness' in vin for vin in inputs):
+        for input in inputs:
+            if 'witness' in input:
+                for witness_item in input['witness']:
+                    tx_data += varint_encode(len(witness_item) // 2)  # Length of witness item in bytes
+                    tx_data += bytes.fromhex(witness_item)
+                    marker = bytes.fromhex('00')
+                    flag = bytes.fromhex('01')
+                    tx_data = marker + flag + tx_data  # Add segwit marker and flag
+    # Calculate wtxid (hash of tx_data with marker and flag)
+    tx_data += little_endian_bytes(locktime, 4)
+    wtxid_data = little_endian_bytes(version, 4) + tx_data
+    wtxid_hash = hashlib.sha256(hashlib.sha256(wtxid_data).digest()).digest()
+
+ return wtxid_data.hex(), wtxid_hash[::-1].hex()
+
 def compute_witness_commitment(witness_root_hash):
 
     reserved_value = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -313,7 +375,9 @@ def create_coinbase(wTXID_commit):
           },
         "scriptsig": "03233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100",
         "scriptsig_asm": "",
-        "witness": "0000000000000000000000000000000000000000000000000000000000000000"
+        "witness": [
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
         ,
         "is_coinbase": True,
         "sequence": 4294837295
@@ -325,16 +389,24 @@ def create_coinbase(wTXID_commit):
          "scriptpubkey_asm": "OP_DUP OP_HASH160 OP_PUSHBYTES_20 acd783f632ad040fc72d9a06ec17ffb2d8a97a5d OP_EQUALVERIFY OP_CHECKSIG",
          "scriptpubkey_type": "p2pkh",
          "scriptpubkey_address": "1GkuQGoy1erCJfQKY9AGC75rttCBQRtGer",
-         "value": 2756995
+         "value": 0
         },
         {
-        "scriptpubkey": wTXID_commit,
+        "scriptpubkey": "6a24aa21a9ed"+ wTXID_commit,
         "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 56789b58e00f0a9e866e2a4ea0b0d97e839c4b0d",
         "scriptpubkey_type": "v0_p2wpkh",
         "scriptpubkey_address": "bc1q2eufkk8qpu9fapnw9f82pvxe06pecjcd7ea2x0",
-        "value": 1098
+        "value": 0
        }
-    ]
+    ],
+    "witness": [{
+            "stackitems": "01",
+            "0": {
+                "size": "20",
+                "item": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+        }
+        ]
     }]
      return coinbase_struct
 
@@ -615,10 +687,13 @@ def main():
         wit_hash = merkle_root(wtxids)
         wit_commitment = compute_witness_commitment(wit_hash)
         coinbase_trxn_struct = create_coinbase(wit_commitment)
-        txid_arr, rev_txid_arr, ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_transaction(coinbase_trxn_struct)
+
+        ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_coinbase(coinbase_trxn_struct)
         print(f"ser_coinbase:{ser_coinbase_trxn}")
         print(f"rev_coinbase_id:{rev_ser_coinbase_trxn_id}")
         rev_trxn_ids.insert(0, rev_ser_coinbase_trxn_id)
+
+        
         calc_merkle_root = merkle_root(rev_trxn_ids)
         print(f"mekle root:{calc_merkle_root}")
         nat_order_merkle_root = reverse_byte_order(calc_merkle_root)
