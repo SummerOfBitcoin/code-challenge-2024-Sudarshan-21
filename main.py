@@ -275,7 +275,7 @@ def wit_serialize_transaction(transactions):
     tx_data += little_endian_bytes(locktime, 4)
     wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
 
-    wtxid_array.append(wtxid_hash[::-1].hex())
+    wtxid_array.append(wtxid_hash.hex())
 
   return wtxid_array, tx_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
@@ -641,7 +641,8 @@ def main():
 
         txids, rev_trxn_ids, ser_trxn, ser_tx_id = serialize_transaction(block_trxns)
         rev_wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
-        wit_hash = merkle_root(rev_wtxids)
+        print(f"{len(rev_wtxids)}")
+        wit_hash = reverse_byte_order(merkle_root(rev_wtxids))
         print(f"{wit_hash}")
         wit_commitment = compute_witness_commitment(wit_hash)
         print(f"{wit_commitment}")
