@@ -301,7 +301,7 @@ def serialize_coinbase(transactions):
     tx_data += varint_encode(len(inputs))
     for input in inputs:
         txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
-        prev_tx_out_index = input['vout']
+        prev_tx_out_index = bytes.fromhex(input['vout'])
         scriptsig = bytes.fromhex(input['scriptsig'])
         sequence = input['sequence']
 
@@ -365,55 +365,9 @@ def compute_witness_commitment(witness_root_hash):
 
     return wtxid_commitment
 
-def create_coinbase(wTXID_commit, block_Height):
-     coinbase_struct = [{
-        "version": 2,
-        "locktime": 0,
-        "vin": [
-         {
-          "txid": "0000000000000000000000000000000000000000000000000000000000000000",
-          "vout": "ffffffff",
-          "prevout": {
-            "scriptpubkey": "001481897cd2113b1b0bf0e718cc791d9bd2d246c555",
-            "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 81897cd2113b1b0bf0e718cc791d9bd2d246c555",
-            "scriptpubkey_type": "v0_p2wpkh",
-            "scriptpubkey_address": "bc1qsxyhe5s38vdshu88rrx8j8vm6tfyd324l640wa",
-            "value": 0
-          },
-        "scriptsig": "03" + block_Height + "10076c0000946e0100",
-        "witness": [
-            "0000000000000000000000000000000000000000000000000000000000000000"
-        ]
-        ,
-        "is_coinbase": True,
-        "sequence": 0
-        }
-        ],
-        "vout": [
-        {
-        "scriptpubkey": "6a24aa21a9ed"+ wTXID_commit,
-        "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 56789b58e00f0a9e866e2a4ea0b0d97e839c4b0d",
-        "scriptpubkey_type": "v0_p2wpkh",
-        "scriptpubkey_address": "bc1q2eufkk8qpu9fapnw9f82pvxe06pecjcd7ea2x0",
-        "value": 0
-       },
-        {
-         "scriptpubkey": "76a914acd783f632ad040fc72d9a06ec17ffb2d8a97a5d88ac",
-         "scriptpubkey_asm": "OP_DUP OP_HASH160 OP_PUSHBYTES_20 acd783f632ad040fc72d9a06ec17ffb2d8a97a5d OP_EQUALVERIFY OP_CHECKSIG",
-         "scriptpubkey_type": "p2pkh",
-         "scriptpubkey_address": "1GkuQGoy1erCJfQKY9AGC75rttCBQRtGer",
-         "value": 0
-        }
-    ],
-    "witness": [{
-            "0": {
-                "size": "01",
-                "item": "0000000000000000000000000000000000000000000000000000000000000000"
-            }
-        }
-        ]
-    }]
-     return coinbase_struct
+def create_coinbase(wTXID_commit):
+     serialize_coinbase = f"010000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff2503233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100ffffffff02f595814a000000001976a914edf10a7fac6b32e24daa5305c723f3de58db1bc888ac0000000000000000266a24aa21a9ed{wTXID_commit}0120000000000000000000000000000000000000000000000000000000000000000000000000"
+     return serialize_coinbase
 
 
 def validate_transaction(transaction):
@@ -688,13 +642,12 @@ def main():
         txids, rev_trxn_ids, ser_trxn, ser_tx_id = serialize_transaction(block_trxns)
         rev_wtxids, ser_wit_trxn, wtxid, rev_wtxid = wit_serialize_transaction(block_trxns)
         wit_hash = merkle_root(rev_wtxids)
+        print(f"{wit_hash}")
         wit_commitment = compute_witness_commitment(wit_hash)
         print(f"{wit_commitment}")
-        coinbase_trxn_struct = create_coinbase(wit_commitment, "951a06")
+        ser_coinbase_trxn = create_coinbase(wit_commitment)
 
-        ser_coinbase_trxn, rev_ser_coinbase_trxn_id = serialize_coinbase(coinbase_trxn_struct)
-        print(f"ser_coinbase:{ser_coinbase_trxn}")
-        print(f"rev_coinbase_id:{rev_ser_coinbase_trxn_id}")
+        rev_ser_coinbase_trxn_id = hashlib.sha256(hashlib.sha256(bytes.fromhex(ser_coinbase_trxn)).digest()).digest()[::-1].hex()
         rev_trxn_ids.insert(0, rev_ser_coinbase_trxn_id)
 
         
@@ -712,7 +665,6 @@ def main():
 
         print(f"Block Header: {block_header}")
         print(f"Block Hash: {block_hash}")
-        print(f"Coinbase Transaction: {coinbase_trxn_struct}")
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
