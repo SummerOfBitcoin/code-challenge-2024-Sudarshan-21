@@ -275,7 +275,7 @@ def wit_serialize_transaction(transactions):
     tx_data += little_endian_bytes(locktime, 4)
     wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
 
-    wtxid_array.append(wtxid_hash[::-1].hex())
+    wtxid_array.append(wtxid_hash.hex())
 
   return wtxid_array, tx_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
@@ -308,7 +308,7 @@ def serialize_coinbase(transactions):
         # Append txid, prev_tx_out_index, scriptsig
         tx_data += (
             txid +
-            little_endian_bytes(prev_tx_out_index, 4) +
+            prev_tx_out_index +
             varint_encode(len(scriptsig)) +
             scriptsig +
             little_endian_bytes(sequence, 4)
@@ -372,7 +372,7 @@ def create_coinbase(wTXID_commit, block_Height):
         "vin": [
          {
           "txid": "0000000000000000000000000000000000000000000000000000000000000000",
-          "vout": 1,
+          "vout": "ffffffff",
           "prevout": {
             "scriptpubkey": "001481897cd2113b1b0bf0e718cc791d9bd2d246c555",
             "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 81897cd2113b1b0bf0e718cc791d9bd2d246c555",
