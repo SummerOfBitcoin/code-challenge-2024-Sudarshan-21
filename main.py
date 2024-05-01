@@ -275,7 +275,7 @@ def wit_serialize_transaction(transactions):
     tx_data += little_endian_bytes(locktime, 4)
     wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
 
-    wtxid_array.append(wtxid_hash.hex())
+    wtxid_array.append(wtxid_hash[::-1].hex())
 
   return wtxid_array, tx_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
 
