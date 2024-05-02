@@ -277,7 +277,7 @@ def main():
         valid_transactions = [tx for tx in transactions if validate_transaction(tx)]
         print(f"Number of valid transactions read from mempool: {len(valid_transactions)}")
         
-        max_total_weight = 3300000  # Maximum cumulative weight allowed (4 million weight units)
+        max_total_weight = 3200000  # Maximum cumulative weight allowed (4 million weight units)
 
         # Trim transactions to meet the weight constraint
         selected_transactions, total_weight = trim_transactions(valid_transactions, max_total_weight)
