@@ -6,6 +6,14 @@ import binascii
 import time
 import sys
 
+from utils.header import calculate_block_header, calculate_block_hash
+from utils.coinbase import compute_witness_commitment, create_coinbase
+from utils.weight import trim_transactions
+from utils.serialize import serialize_transaction, wit_serialize_transaction
+from utils.merkleroot import merkle_root
+
+
+
 MAX_BLOCK_SIZE_BYTES = 1000000
 # Path to mempool folder containing transaction files
 MEMPOOL_FOLDER = "./mempool"
@@ -13,76 +21,6 @@ MEMPOOL_FOLDER = "./mempool"
 PUBLIC_KEYS_DIR = "./public_keys"
 
 
-def calculate_base_size(transaction):
-    base_size = 8  # version (4 bytes) + locktime (4 bytes)
-
-    # Calculate size for each input
-    for vin in transaction['vin']:
-        base_size += 32  # txid (32 bytes)
-        base_size += 4   # vout (4 bytes)
-
-        # Calculate ScriptSig length
-        script_sig_length = len(vin.get('scriptsig', '')) // 2  # Convert hex string length to bytes
-        base_size += script_sig_length + 1  # scriptsig length (1 byte) + scriptSig length
-
-        base_size += 4   # sequence (4 bytes)
-
-    # Calculate size for each output
-    for vout in transaction['vout']:
-        base_size += 8   # value (8 bytes)
-        base_size += 1   # scriptpubkey length (1 byte)
-        base_size += len(vout['scriptpubkey']) // 2  # scriptpubkey length (variable)
-
-    return base_size
-
-def calculate_total_size(transaction):
-    total_size = 0
-
-    # Add witness data size for SegWit transactions
-    for vin in transaction['vin']:
-        if 'witness' in vin and vin['witness']:
-            # Include witness marker (1 byte) and flag (1 byte)
-            total_size += 2
-            # Add witness stack size
-            total_size += len(vin['witness']) * 64  # Assuming witness stack items are 64 bytes each
-
-    return total_size
-
-def calculate_transaction_weight(transaction):
-    base_size = calculate_base_size(transaction)
-    total_size = calculate_total_size(transaction)
-
-    weight = 4 * base_size + total_size
-    return weight
-
-
-
-def calculate_transaction_weights(transactions):
-    # Calculate weights for each transaction
-    transaction_weights = []
-    for transaction in transactions:
-        weight = calculate_transaction_weight(transaction)
-        transaction_weights.append((transaction, weight))
-
-    # Sort transactions by weight (ascending order)
-    transaction_weights.sort(key=lambda x: x[1])
-
-    return transaction_weights
-
-
-def trim_transactions(transactions, max_weight):
-    sorted_transaction_weights = calculate_transaction_weights(transactions)
-    selected_transactions = []
-    current_weight = 0
-
-    for transaction, weight in sorted_transaction_weights:
-        if current_weight + weight <= max_weight:
-            selected_transactions.append((transaction, weight))
-            current_weight += weight
-        else:
-            break
-
-    return selected_transactions, current_weight
 
 
 def load_public_key(address):
@@ -123,251 +61,7 @@ def convert_bits_to_hex(bits):
 
     return new_bits
 
-def calculate_block_header(version, prev_block_hash, merkle_root, timestamp, bits, nonce):
-    block_header = f"{version}{prev_block_hash}{merkle_root}{timestamp}{bits}{nonce}"
-    return block_header
 
-
-def little_endian_bytes(value, length):
-    return value.to_bytes(length, byteorder='little')
-
-def varint_encode(value):
-    if value < 0xfd:
-        return value.to_bytes(1, 'little')
-    elif value <= 0xffff:
-        return b'\xfd' + value.to_bytes(2, 'little')
-    elif value <= 0xffffffff:
-        return b'\xfe' + value.to_bytes(4, 'little')
-    else:
-        return b'\xff' + value.to_bytes(8, 'little')
-
-
-
-def little_endian_bytes(value, length):
-    return value.to_bytes(length, byteorder='little')
-
-def varint_encode(value):
-    if value < 0xfd:
-        return value.to_bytes(1, 'little')
-    elif value <= 0xffff:
-        return b'\xfd' + value.to_bytes(2, 'little')
-    elif value <= 0xffffffff:
-        return b'\xfe' + value.to_bytes(4, 'little')
-    else:
-        return b'\xff' + value.to_bytes(8, 'little')
-
-
-def serialize_transaction(transactions):
-  txid_array = []
-  rev_txid_array = []
-  for transaction in transactions:
-    version = transaction['version']
-    locktime = transaction['locktime']
-    inputs = transaction['vin']
-    outputs = transaction['vout']
-
-    # Start building the transaction byte array
-    tx_data = (
-        little_endian_bytes(version, 4) +
-        varint_encode(len(inputs))
-    )
-
-    # Process each input
-    for input in inputs:
-        txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
-        prev_tx_out_index = input['vout']
-        scriptsig = bytes.fromhex(input['scriptsig'])
-        sequence = input['sequence']
-
-        # Append txid, prev_tx_out_index, scriptsig
-        tx_data += (
-            txid +
-            little_endian_bytes(prev_tx_out_index, 4) +
-            varint_encode(len(scriptsig)) +
-            scriptsig +
-            little_endian_bytes(sequence, 4)
-        )
-
-    # Output count
-    tx_data += varint_encode(len(outputs))
-
-    # Process each output
-    for output in outputs:
-        value = output['value']
-        script_pubkey = bytes.fromhex(output['scriptpubkey'])
-
-        # Append output value, script_pubkey
-        tx_data += (
-            little_endian_bytes(value, 8) +
-            varint_encode(len(script_pubkey)) +
-            script_pubkey
-        )
-
-    # Calculate wtxid (hash of tx_data with marker and flag)
-    tx_data += little_endian_bytes(locktime, 4)
-    ser_tx_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
-    txid_array.append(ser_tx_hash.hex())
-    rev_txid_array.append(ser_tx_hash[::-1].hex())
-
-  return txid_array, rev_txid_array, tx_data.hex(), ser_tx_hash[::-1].hex()
-
-
-def wit_serialize_transaction(transactions):
-  wtxid_array = ['0000000000000000000000000000000000000000000000000000000000000000']
-  for transaction in transactions:
-    version = transaction['version']
-    locktime = transaction['locktime']
-    inputs = transaction['vin']
-    outputs = transaction['vout']
-
-    tx_data = (
-        little_endian_bytes(version, 4) 
-    )
-
-    has_witness = any('witness' in vin for vin in inputs)
-    if has_witness :
-     tx_data += bytes.fromhex('00')
-     tx_data += bytes.fromhex('01')
-    # Process each input
-
-    tx_data += varint_encode(len(inputs))
-    for input in inputs:
-        txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
-        prev_tx_out_index = input['vout']
-        scriptsig = bytes.fromhex(input['scriptsig'])
-        sequence = input['sequence']
-
-        # Append txid, prev_tx_out_index, scriptsig
-        tx_data += (
-            txid +
-            little_endian_bytes(prev_tx_out_index, 4) +
-            varint_encode(len(scriptsig)) +
-            scriptsig +
-            little_endian_bytes(sequence, 4)
-        )
-
-    # Output count
-    tx_data += varint_encode(len(outputs))
-
-    # Process each output
-    for output in outputs:
-        value = output['value']
-        script_pubkey = bytes.fromhex(output['scriptpubkey'])
-
-        # Append output value, script_pubkey
-        tx_data += (
-            little_endian_bytes(value, 8) +
-            varint_encode(len(script_pubkey)) +
-            script_pubkey
-        )
-    
-    if has_witness:
-        for input in inputs:
-            if 'witness' in input:
-                witness = input['witness']
-                tx_data += varint_encode(len(witness))
-                for witness_item in input['witness']:
-                    tx_data += varint_encode(len(bytes.fromhex(witness_item)))  # Length of witness item
-                    tx_data += bytes.fromhex(witness_item)
-
-
-    # Calculate wtxid (hash of tx_data with marker and flag)
-    tx_data += little_endian_bytes(locktime, 4)
-    wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
-
-    wtxid_array.append(wtxid_hash[::-1].hex())
-
-  return wtxid_array, tx_data.hex(), wtxid_hash.hex(), wtxid_hash[::-1].hex()
-
-
-
-def serialize_coinbase(transactions):
- for transaction in transactions:
-    version = transaction['version']
-    locktime = transaction['locktime']
-    inputs = transaction['vin']
-    outputs = transaction['vout']
-
-    tx_data = (
-        little_endian_bytes(version, 4) 
-    )
-
-    has_witness = any('witness' in vin for vin in inputs)
-    if has_witness :
-     tx_data += bytes.fromhex('00')
-     tx_data += bytes.fromhex('01')
-    # Process each input
-
-    tx_data += varint_encode(len(inputs))
-    for input in inputs:
-        txid = bytes.fromhex(input['txid'])[::-1]  # Reverse txid for little-endian
-        prev_tx_out_index = bytes.fromhex(input['vout'])
-        scriptsig = bytes.fromhex(input['scriptsig'])
-        sequence = input['sequence']
-
-        # Append txid, prev_tx_out_index, scriptsig
-        tx_data += (
-            txid +
-            prev_tx_out_index +
-            varint_encode(len(scriptsig)) +
-            scriptsig +
-            little_endian_bytes(sequence, 4)
-        )
-
-    # Output count
-    tx_data += varint_encode(len(outputs))
-
-    # Process each output
-    for output in outputs:
-        value = output['value']
-        script_pubkey = bytes.fromhex(output['scriptpubkey'])
-
-        # Append output value, script_pubkey
-        tx_data += (
-            little_endian_bytes(value, 8) +
-            varint_encode(len(script_pubkey)) +
-            script_pubkey
-        )
-    
-    if has_witness:
-        for input in inputs:
-            if 'witness' in input:
-                witness = input['witness']
-                tx_data += varint_encode(len(witness))
-                for witness_item in input['witness']:
-                    tx_data += varint_encode(len(bytes.fromhex(witness_item)))  # Length of witness item
-                    tx_data += bytes.fromhex(witness_item)
-
-
-    # Calculate wtxid (hash of tx_data with marker and flag)
-    tx_data += little_endian_bytes(locktime, 4)
-    wtxid_hash = hashlib.sha256(hashlib.sha256(tx_data).digest()).digest()
-
- 
- return tx_data.hex(), wtxid_hash[::-1].hex()
-
-def compute_witness_commitment(witness_root_hash):
-
-    reserved_value = "0000000000000000000000000000000000000000000000000000000000000000"
-    # Convert witness root hash and reserved value to bytes
-    witness_root_hash_bytes = bytes.fromhex(witness_root_hash)
-    reserved_value_bytes = bytes.fromhex(reserved_value)
-
-    # Concatenate witness root hash and reserved value
-    concatenated_data = witness_root_hash_bytes + reserved_value_bytes
-
-    # Perform SHA-256 hashing twice (SHA-256d)
-    sha256_hash = hashlib.sha256(concatenated_data).digest()
-    sha256d_hash = hashlib.sha256(sha256_hash).digest()
-
-    # Derive the wTXID commitment (hexadecimal representation)
-    wtxid_commitment = sha256d_hash.hex()  # Reverse bytes for little-endian
-
-    return wtxid_commitment
-
-def create_coinbase(wTXID_commit):
-     serialize_coinbase = f"010000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff2503233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100ffffffff02f595814a000000001976a914edf10a7fac6b32e24daa5305c723f3de58db1bc888ac0000000000000000266a24aa21a9ed{wTXID_commit}0120000000000000000000000000000000000000000000000000000000000000000000000000"
-     return serialize_coinbase
 
 
 def validate_transaction(transaction):
@@ -522,36 +216,6 @@ def write_transaction_ids(output_file, trxn_ids):
             output_file.write(f"{trxn_id}\n")
 
 
-def merkle_root(ser_txids):
-    # Compute Merkle root hash using the extracted txids
-    if len(ser_txids) == 0:
-        return None
-
-    while len(ser_txids) > 1:
-        next_level = []
-        # Pair and hash the txids
-        for i in range(0, len(ser_txids), 2):
-            if i + 1 < len(ser_txids):  # Ensure we have pairs
-                hash_pair = hash2(ser_txids[i], ser_txids[i+1])
-            else:  # If odd number of txids, hash with itself
-                hash_pair = hash2(ser_txids[i], ser_txids[i])
-            next_level.append(hash_pair)
-        ser_txids = next_level  # Update txids to next level
-    
-    return ser_txids[0] if ser_txids else None
-
-def hash2(a, b):
-    # Reverse inputs before and after hashing due to endian issues
-    a1 = bytes.fromhex(a)[::-1]
-    b1 = bytes.fromhex(b)[::-1]
-    concat_bytes = a1 + b1
-    first_hash = hashlib.sha256(concat_bytes).digest()
-    second_hash = hashlib.sha256(first_hash).digest()
-    final_hash_hex = second_hash[::-1].hex()
-    
-    return final_hash_hex
-
-
 def reverse_byte_order(hex_string):
     # Convert the hexadecimal string to bytes
     byte_sequence = bytes.fromhex(hex_string)
@@ -565,21 +229,7 @@ def reverse_byte_order(hex_string):
     return reversed_hex_string
 
 
-def calculate_block_hash(block_header):
-    try:
-        # Encode the block header string as bytes using UTF-8 encoding
-        block_header_bytes = bytes.fromhex(block_header)
-        # Calculate double SHA-256 hash
-        hash_1 = hashlib.sha256(block_header_bytes).digest()
-        hash_2 = hashlib.sha256(hash_1).digest()
-        # Return the hash as a hexadecimal string
-        return hash_2
-    except Exception as e:
-        print(f"Error calculating block hash: {str(e)}")
-        return None
     
-
-
     
 def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinbase_trxn):
    # Convert version and bits to hexadecimal format
@@ -593,11 +243,11 @@ def mine_block(txids, prev_block_hash, difficulty_target, merkle_root, ser_coinb
         nonce_hex = nonce.to_bytes(4, byteorder='little', signed=False).hex()
 
         # Construct the block header
-        block_header = version_hex + prev_block_hash + merkle_root + timestamp_hex + bits + nonce_hex
-        
+        block_header = calculate_block_header(version_hex, prev_block_hash, merkle_root, timestamp_hex, bits, nonce_hex)
+    
         # Calculate the block hash
-        block_hash = hashlib.sha256(hashlib.sha256(bytes.fromhex(block_header)).digest()).digest()
-        # Check if the block hash meets the difficulty target
+        block_hash = calculate_block_hash(block_header)
+         # Check if the block hash meets the difficulty target
         if int.from_bytes(block_hash[::-1], byteorder='big') < int(difficulty_target, 16):
             print(f"Block mined! Nonce: {nonce}")
 
