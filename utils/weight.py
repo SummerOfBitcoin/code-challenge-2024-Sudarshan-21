@@ -42,20 +42,27 @@ def calculate_transaction_weight(transaction):
     weight = 4 * base_size + total_size
     return weight
 
-
+def calculate_transaction_weights(transactions):
+  transaction_weights = []
+  for transaction in transactions:
+    weight = calculate_transaction_weight(transaction)
+    transaction_weights.append((transaction, weight))
+  
+  transaction_weights.sort(key=lambda x: x[1])
+  return transaction_weights
 
 def trim_transactions(transactions, max_weight):
-    sorted_transaction_fees = calculate_transaction_fees(transactions)
+    sorted_transaction_weights = calculate_transaction_weights(transactions)
     selected_transactions = []
     current_weight = 0
     Total_fees=0
 
-    for transaction, fee in sorted_transaction_fees:
-        Total_fees+= fee
-        transaction_weight = calculate_transaction_weight(transaction)
-        if current_weight + transaction_weight <= max_weight:
-            selected_transactions.append((transaction, fee))
-            current_weight += transaction_weight
+    for transaction, weight in sorted_transaction_weights:
+        fee = calculate_transaction_fees(transaction)
+        if current_weight + weight <= max_weight:
+            selected_transactions.append((transaction, weight))
+            current_weight += weight
+            Total_fees += fee
         else:
             break
 
