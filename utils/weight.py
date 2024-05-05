@@ -1,3 +1,5 @@
+from .fees import calculate_transaction_fees
+
 def calculate_base_size(transaction):
     base_size = 8  # version (4 bytes) + locktime (4 bytes)
 
@@ -42,29 +44,19 @@ def calculate_transaction_weight(transaction):
 
 
 
-def calculate_transaction_weights(transactions):
-    # Calculate weights for each transaction
-    transaction_weights = []
-    for transaction in transactions:
-        weight = calculate_transaction_weight(transaction)
-        transaction_weights.append((transaction, weight))
-
-    # Sort transactions by weight (ascending order)
-    transaction_weights.sort(key=lambda x: x[1])
-
-    return transaction_weights
-
-
 def trim_transactions(transactions, max_weight):
-    sorted_transaction_weights = calculate_transaction_weights(transactions)
+    sorted_transaction_fees = calculate_transaction_fees(transactions)
     selected_transactions = []
     current_weight = 0
+    Total_fees=0
 
-    for transaction, weight in sorted_transaction_weights:
-        if current_weight + weight <= max_weight:
-            selected_transactions.append((transaction, weight))
-            current_weight += weight
+    for transaction, fee in sorted_transaction_fees:
+        Total_fees+= fee
+        transaction_weight = calculate_transaction_weight(transaction)
+        if current_weight + transaction_weight <= max_weight:
+            selected_transactions.append((transaction, fee))
+            current_weight += transaction_weight
         else:
             break
 
-    return selected_transactions, current_weight
+    return selected_transactions, current_weight, Total_fees

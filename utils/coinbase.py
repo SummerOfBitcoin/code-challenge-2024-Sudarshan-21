@@ -1,5 +1,10 @@
 import hashlib
 
+def satoshis_to_hex(amount_satoshis):
+    hex_amount = format(amount_satoshis, '016x')  # 16 characters for 64-bit (8 bytes) little-endian format
+    hex_amount_le = ''.join(reversed([hex_amount[i:i+2] for i in range(0, len(hex_amount), 2)]))
+    return hex_amount_le
+
 def compute_witness_commitment(witness_root_hash):
 
     reserved_value = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -19,7 +24,7 @@ def compute_witness_commitment(witness_root_hash):
 
     return wtxid_commitment
 
-def create_coinbase(wTXID_commit):
+def create_coinbase(wTXID_commit, coinbase_fees):
      '''
        def serialize_coinbase(transactions):
  for transaction in transactions:
@@ -86,5 +91,5 @@ def create_coinbase(wTXID_commit):
  
  return tx_data.hex(), wtxid_hash[::-1].hex()
      '''
-     serialize_coinbase = f"010000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff2503233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100ffffffff02f595814a000000001976a914edf10a7fac6b32e24daa5305c723f3de58db1bc888ac0000000000000000266a24aa21a9ed{wTXID_commit}0120000000000000000000000000000000000000000000000000000000000000000000000000"
+     serialize_coinbase = f"010000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff2503233708184d696e656420627920416e74506f6f6c373946205b8160a4256c0000946e0100ffffffff02{coinbase_fees}1976a914edf10a7fac6b32e24daa5305c723f3de58db1bc888ac0000000000000000266a24aa21a9ed{wTXID_commit}0120000000000000000000000000000000000000000000000000000000000000000000000000"
      return serialize_coinbase

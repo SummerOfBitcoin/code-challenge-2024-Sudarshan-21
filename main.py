@@ -7,7 +7,7 @@ import time
 import sys
 
 from utils.header import calculate_block_header, calculate_block_hash
-from utils.coinbase import compute_witness_commitment, create_coinbase
+from utils.coinbase import compute_witness_commitment, create_coinbase, satoshis_to_hex
 from utils.weight import trim_transactions
 from utils.serialize import serialize_transaction, wit_serialize_transaction
 from utils.merkleroot import merkle_root
@@ -280,7 +280,7 @@ def main():
         max_total_weight = 3200000  # Maximum cumulative weight allowed (4 million weight units)
 
         # Trim transactions to meet the weight constraint
-        selected_transactions, total_weight = trim_transactions(valid_transactions, max_total_weight)
+        selected_transactions, total_weight, total_fees = trim_transactions(valid_transactions, max_total_weight)
         print(f"Total Cumulative Weight: {total_weight}")
         block_trxns = []
         for transaction, weight in selected_transactions:
@@ -296,7 +296,9 @@ def main():
         print(f"{wit_hash}")
         wit_commitment = compute_witness_commitment(wit_hash)
         print(f"{wit_commitment}")
-        ser_coinbase_trxn = create_coinbase(wit_commitment)
+        coinbase_fees = total_fees + 315000000
+        coinbase_fees_hex = satoshis_to_hex(coinbase_fees)
+        ser_coinbase_trxn = create_coinbase(wit_commitment, coinbase_fees_hex)
 
         rev_ser_coinbase_trxn_id = hashlib.sha256(hashlib.sha256(bytes.fromhex(ser_coinbase_trxn)).digest()).digest()[::-1].hex()
         rev_trxn_ids.insert(0, rev_ser_coinbase_trxn_id)
